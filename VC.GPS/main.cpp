@@ -230,6 +230,8 @@ namespace {
     std::uintptr_t* ppMenuNew = nullptr;
     CVector lastMenuTargetPos = {0.0f, 0.0f, 0.0f};
     CVector lastMenuPlayerPos = {0.0f, 0.0f, 0.0f};
+    CVector lastRadarTargetPos = {0.0f, 0.0f, 0.0f};
+    CVector lastRadarPlayerPos = {0.0f, 0.0f, 0.0f};
 }
 
 // Forward Declarations
@@ -614,7 +616,12 @@ void ProcessPathfind()
 
         if (info.targetPoint)
         {
-            DoPathSearch(gPathfind, static_cast<unsigned char>(ePathNodeType::PATHNODE_VEHICLE_PATH), playerCar->m_sCoords.m_sMatrix.pos, -1, *info.targetPoint, gapPathNodes.data(), &gwPathNodesCount, MAX_POINTS, playerCar, nullptr, 999999.0f, -1);
+            if (*info.targetPoint != lastRadarTargetPos || playerCar->m_sCoords.m_sMatrix.pos != lastRadarPlayerPos)
+            {
+                lastRadarTargetPos = *info.targetPoint;
+                lastRadarPlayerPos = playerCar->m_sCoords.m_sMatrix.pos;
+                DoPathSearch(gPathfind, static_cast<unsigned char>(ePathNodeType::PATHNODE_VEHICLE_PATH), playerCar->m_sCoords.m_sMatrix.pos, -1, *info.targetPoint, gapPathNodes.data(), &gwPathNodesCount, MAX_POINTS, playerCar, nullptr, 999999.0f, -1);
+            }
             if (gwPathNodesCount > 1)
             {
                 RwRenderStateSet(rwRENDERSTATETEXTURERASTER, 0);
@@ -656,7 +663,15 @@ void ProcessPathfind()
         else
         {
             gwPathNodesCount = 0;
+            lastRadarTargetPos = {0.0f, 0.0f, 0.0f};
+            lastRadarPlayerPos = {0.0f, 0.0f, 0.0f};
         }
+    }
+    else
+    {
+        gwPathNodesCount = 0;
+        lastRadarTargetPos = {0.0f, 0.0f, 0.0f};
+        lastRadarPlayerPos = {0.0f, 0.0f, 0.0f};
     }
 }
 

@@ -101,8 +101,7 @@ using CVector2D = RwV2d;
 
 enum class ePathNodeType
 {
-    PATHNODE_VEHICLE_PATH = 0,
-    PATHNODE_PED_PATH = 1
+    PATHNODE_VEHICLE_PATH = 0
 };
 
 struct CVector2DShort

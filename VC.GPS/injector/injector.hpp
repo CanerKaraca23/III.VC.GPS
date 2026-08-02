@@ -489,27 +489,57 @@ inline void MakeRelativeOffset(memory_pointer_tr at, memory_pointer_tr dest, siz
 /*
  *  GetBranchDestination
  *      Gets the destination of a branch instruction at address @at
- *      *** Works only with JMP and CALL for now ***
  */
 inline memory_pointer_raw GetBranchDestination(memory_pointer_tr at, bool vp = true)
 {
-    switch(ReadMemory<uint8_t>(at, vp))
+    while(true)
     {
-        // We need to handle other instructions (and prefixes) later...
-        case 0xE8:	// call rel
-        case 0xE9:	// jmp rel
-            return ReadRelativeOffset(at + 1, 4, vp);
+        switch(ReadMemory<uint8_t>(at, vp))
+        {
+            // We need to handle other instructions (and prefixes) later...
+            case 0xE8:	// call rel
+            case 0xE9:	// jmp rel
+                return ReadRelativeOffset(at + 1, 4, vp);
 
-        case 0xFF: 
-            switch(ReadMemory<uint8_t>(at + 1, vp))
+            case 0xEB:  // jmp rel8
+            case 0x70: case 0x71: case 0x72: case 0x73: case 0x74: case 0x75:
+            case 0x76: case 0x77: case 0x78: case 0x79: case 0x7A: case 0x7B:
+            case 0x7C: case 0x7D: case 0x7E: case 0x7F: // jcc rel8
+                return ReadRelativeOffset(at + 1, 1, vp);
+
+            case 0x0F:
             {
-                case 0x15:  // call dword ptr [addr]
-                case 0x25:  // jmp dword ptr [addr]
-                    return *(ReadMemory<uintptr_t*>(at + 2, vp));
+                uint8_t next = ReadMemory<uint8_t>(at + 1, vp);
+                if(next >= 0x80 && next <= 0x8F) // jcc rel
+                {
+                    return ReadRelativeOffset(at + 2, 4, vp);
+                }
+                return nullptr;
             }
-            break;
+
+            case 0xFF:
+                switch(ReadMemory<uint8_t>(at + 1, vp))
+                {
+                    case 0x15:  // call dword ptr [addr]
+                    case 0x25:  // jmp dword ptr [addr]
+                        return *(ReadMemory<uintptr_t*>(at + 2, vp));
+                }
+                return nullptr;
+
+            // Prefixes
+            case 0x2E: case 0x36: case 0x3E: case 0x26: case 0x64: case 0x65: // Segment overrides
+            case 0x66: // Operand-size override
+            case 0x67: // Address-size override
+            case 0xF0: // LOCK prefix
+            case 0xF2: // REPNE/REPNZ prefix
+            case 0xF3: // REP or REPE/REPZ prefix
+                at = at + 1;
+                continue;
+
+            default:
+                return nullptr;
+        }
     }
-    return nullptr;
 }
 
 /*

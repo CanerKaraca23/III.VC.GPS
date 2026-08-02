@@ -405,7 +405,8 @@ void DrawPathFindLineMenuMap()
 
     if (info.targetPoint && playerCar)
     {
-        if (*info.targetPoint != lastMenuTargetPos || playerCar->m_sCoords.m_sMatrix.pos != lastMenuPlayerPos)
+        if (GetSquaredDistanceBetweenPoints(*info.targetPoint, lastMenuTargetPos) > 1.0f ||
+            GetSquaredDistanceBetweenPoints(playerCar->m_sCoords.m_sMatrix.pos, lastMenuPlayerPos) > 1.0f)
         {
             lastMenuTargetPos = *info.targetPoint;
             lastMenuPlayerPos = playerCar->m_sCoords.m_sMatrix.pos;

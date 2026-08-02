@@ -127,10 +127,18 @@ class game_version_manager
         void RaiseIncompatibleVersion()
         {
             char buf[128], v[32];
-            sprintf_s(buf, sizeof(buf),
+            int written = snprintf(buf, sizeof(buf),
                 "An incompatible exe version has been detected! (%s)\nContact the mod creator!",
                 GetVersionText(v)
                 );
+
+            if (written < 0 || written >= sizeof(buf))
+            {
+                snprintf(buf, sizeof(buf),
+                    "An incompatible exe version has been detected!\nContact the mod creator!"
+                );
+            }
+
             MessageBoxA(0, buf, PluginName, MB_ICONERROR);
         }
 };

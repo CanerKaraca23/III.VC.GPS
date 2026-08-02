@@ -452,51 +452,45 @@ void DrawPathFindLineMenuMap()
     }
 }
 
-PathLineInfo* GetPlaceInfo(PathLineInfo* info)
+void InitializeMenuMapPlugin()
 {
-    RadarBlip* bestBlip = nullptr;
-    CVector blipPos{0.0f, 0.0f, 0.0f};
-    float distance = 9999800001.99f;
-    float newDistance = 0.0f;
-    unsigned int color = 0;
-
-    if (!bCheckedMenuMap)
+    HMODULE hMenuMap = GetModuleHandleA("MenuMapVC.asi");
+    if (hMenuMap)
     {
-        HMODULE hMenuMap = GetModuleHandleA("MenuMapVC.asi");
-        if (hMenuMap)
+        using MenuMap_RegisterDrawCallback_t = void (*)(void (*)());
+        auto registerCb = reinterpret_cast<MenuMap_RegisterDrawCallback_t>(GetProcAddress(hMenuMap, "MenuMap_RegisterDrawCallback"));
+        if (registerCb) {
+            registerCb(DrawPathFindLineMenuMap);
+            pMenuMap_GetScreenCoords = reinterpret_cast<MenuMap_GetScreenCoords_t>(GetProcAddress(hMenuMap, "MenuMap_GetScreenCoords"));
+        }
+
+        MODULEINFO moduleInfo{};
+        if (GetModuleInformation(GetCurrentProcess(), hMenuMap, &moduleInfo, sizeof(moduleInfo)))
         {
-            using MenuMap_RegisterDrawCallback_t = void (*)(void (*)());
-            auto registerCb = reinterpret_cast<MenuMap_RegisterDrawCallback_t>(GetProcAddress(hMenuMap, "MenuMap_RegisterDrawCallback"));
-            if (registerCb) {
-                registerCb(DrawPathFindLineMenuMap);
-                pMenuMap_GetScreenCoords = reinterpret_cast<MenuMap_GetScreenCoords_t>(GetProcAddress(hMenuMap, "MenuMap_GetScreenCoords"));
-            }
+            auto startAddress = reinterpret_cast<std::uintptr_t>(hMenuMap);
+            std::uintptr_t endAddress = startAddress + moduleInfo.SizeOfImage;
 
-            MODULEINFO moduleInfo{};
-            if (GetModuleInformation(GetCurrentProcess(), hMenuMap, &moduleInfo, sizeof(moduleInfo)))
+            for (std::uintptr_t i = startAddress; i < endAddress - 30; i++)
             {
-                auto startAddress = reinterpret_cast<std::uintptr_t>(hMenuMap);
-                std::uintptr_t endAddress = startAddress + moduleInfo.SizeOfImage;
-
-                for (std::uintptr_t i = startAddress; i < endAddress - 30; i++)
+                if (MemRef<std::uint8_t>(i) == 0xA1 &&
+                    MemRef<std::uint8_t>(i+5) == 0x83 && MemRef<std::uint8_t>(i+6) == 0xEC &&
+                    MemRef<std::uint8_t>(i+8) == 0x85 && MemRef<std::uint8_t>(i+9) == 0xC0 &&
+                    MemRef<std::uint8_t>(i+10) == 0x0F && MemRef<std::uint8_t>(i+11) == 0x84 &&
+                    MemRef<std::uint8_t>(i+16) == 0x83 && MemRef<std::uint8_t>(i+17) == 0x38 && MemRef<std::uint8_t>(i+18) == 0x00 &&
+                    MemRef<std::uint8_t>(i+19) == 0x0F && MemRef<std::uint8_t>(i+20) == 0x84 &&
+                    MemRef<std::uint8_t>(i+25) == 0x83 && MemRef<std::uint8_t>(i+26) == 0x78 && MemRef<std::uint8_t>(i+27) == 0x18 && MemRef<std::uint8_t>(i+28) == 0x00)
                 {
-                    if (MemRef<std::uint8_t>(i) == 0xA1 &&
-                        MemRef<std::uint8_t>(i+5) == 0x83 && MemRef<std::uint8_t>(i+6) == 0xEC &&
-                        MemRef<std::uint8_t>(i+8) == 0x85 && MemRef<std::uint8_t>(i+9) == 0xC0 &&
-                        MemRef<std::uint8_t>(i+10) == 0x0F && MemRef<std::uint8_t>(i+11) == 0x84 &&
-                        MemRef<std::uint8_t>(i+16) == 0x83 && MemRef<std::uint8_t>(i+17) == 0x38 && MemRef<std::uint8_t>(i+18) == 0x00 &&
-                        MemRef<std::uint8_t>(i+19) == 0x0F && MemRef<std::uint8_t>(i+20) == 0x84 &&
-                        MemRef<std::uint8_t>(i+25) == 0x83 && MemRef<std::uint8_t>(i+26) == 0x78 && MemRef<std::uint8_t>(i+27) == 0x18 && MemRef<std::uint8_t>(i+28) == 0x00)
-                    {
-                        ppMenuNew = MemRef<std::uintptr_t*>(i + 1);
-                        break;
-                    }
+                    ppMenuNew = MemRef<std::uintptr_t*>(i + 1);
+                    break;
                 }
             }
         }
-        bCheckedMenuMap = true;
     }
+    bCheckedMenuMap = true;
+}
 
+bool CheckMenuMapTargetBlip(PathLineInfo* info)
+{
     if (ppMenuNew && *ppMenuNew)
     {
         int targetBlipIndex = MemRef<int>(*ppMenuNew + 0x18);
@@ -518,19 +512,22 @@ PathLineInfo* GetPlaceInfo(PathLineInfo* info)
                     {
                         info->color = 0xFFD24DFF;
                         info->targetPoint = targetBlipWorldPos;
-                        return info;
+                        return true;
                     }
                 }
             }
         }
     }
+    return false;
+}
 
-    if (!IsPlayerOnAMission())
-    {
-        info->targetPoint = nullptr;
-        info->color = 0;
-        return info;
-    }
+void FindClosestMissionBlip(PathLineInfo* info)
+{
+    RadarBlip* bestBlip = nullptr;
+    CVector blipPos{0.0f, 0.0f, 0.0f};
+    float distance = 9999800001.99f;
+    float newDistance = 0.0f;
+    unsigned int color = 0;
 
     for (RadarBlip* blip = gRadarBlips; blip != &gRadarBlips[75]; ++blip)
     {
@@ -585,6 +582,7 @@ PathLineInfo* GetPlaceInfo(PathLineInfo* info)
             }
         }
     }
+
     if (bestBlip)
     {
         color = GetRadarTraceColour(bestBlip->m_dwBlipColour, bestBlip->m_bBlipBrightness);
@@ -599,6 +597,28 @@ PathLineInfo* GetPlaceInfo(PathLineInfo* info)
         info->targetPoint = nullptr;
         info->color = 0;
     }
+}
+
+PathLineInfo* GetPlaceInfo(PathLineInfo* info)
+{
+    if (!bCheckedMenuMap)
+    {
+        InitializeMenuMapPlugin();
+    }
+
+    if (CheckMenuMapTargetBlip(info))
+    {
+        return info;
+    }
+
+    if (!IsPlayerOnAMission())
+    {
+        info->targetPoint = nullptr;
+        info->color = 0;
+        return info;
+    }
+
+    FindClosestMissionBlip(info);
     return info;
 }
 

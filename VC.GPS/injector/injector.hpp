@@ -710,10 +710,10 @@ inline bool game_version_manager::Detect()
     DWORD oldVP;
 
     auto dos = (IMAGE_DOS_HEADER*)(base);
-    VirtualProtect(dos, sizeof(IMAGE_DOS_HEADER), PAGE_EXECUTE_READWRITE, &oldVP);
+    VirtualProtect(dos, sizeof(IMAGE_DOS_HEADER), PAGE_READWRITE, &oldVP);
 
     auto nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
-    VirtualProtect(nt, sizeof(IMAGE_NT_HEADERS), PAGE_EXECUTE_READWRITE, &oldVP);
+    VirtualProtect(nt, sizeof(IMAGE_NT_HEADERS), PAGE_READWRITE, &oldVP);
 
             
     // Look for game and version thought the entry-point

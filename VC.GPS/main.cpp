@@ -139,8 +139,7 @@ struct CPathNode //size 0x14
 
 enum class eBlipType
 {
-    BLIP_COORD = 0,
-    BLIP_CAR,
+    BLIP_CAR = 1,
     BLIP_PED,
     BLIP_OBJECT
 };
